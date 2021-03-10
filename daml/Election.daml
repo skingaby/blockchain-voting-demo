@@ -1,0 +1,88 @@
+module Election where
+import DA.Next.Map as Map
+import DA.List as List
+import DA.Optional (fromOptional)
+
+-- Uniquely identifies an election based on what administrators are
+-- running the election and the constituency's name
+type ElectionKey = ([Party], Text)
+
+-- An election contract is created for every constituency 
+-- present in the overall country-wide election.
+template Election
+    with
+        constituency : Text -- The name of the constiuency (or "electoral districts" in the US).
+        administrators : [Party] 
+        voters : [Party] -- Registered voters who yet to cast their vote.
+        candidateVoteCountMap : Map Party Int -- Map of candidates to their corresponding vote counts.
+        candidates : [Party] -- Different candidates that voters can vote for.
+        isElectionOpen : Bool -- Voters should be only be able when the election is open.
+    where 
+        signatory administrators
+        observer voters, candidates -- Voters and Candidates are able to see live how the election progresses.
+
+        key (administrators, constituency): ElectionKey
+        maintainer key._1 -- Specify who owns the election key.
+
+        -- Give a voter the exercise option to cast a vote.
+        choice CastVote : ContractId Election
+            with 
+                voter : Party
+                candidateChoice : Party
+            controller voter
+                do
+                    assertMsg "The election isn't open! Voters can only cast their vote when it is open." (isElectionOpen)
+                    assertMsg "The voter must be registered and must not have already cast a vote." (voter `elem` voters)
+                    assertMsg "The voter's candidate choice is not one of the available candidates'." (candidateChoice `elem` candidates)
+                    
+                    let
+                        currentVoteCount = fromOptional 0 (Map.lookup candidateChoice this.candidateVoteCountMap) 
+                        updatedCandidateVoteCountMap = Map.insert candidateChoice (currentVoteCount + 1) this.candidateVoteCountMap
+
+                    create this with candidateVoteCountMap = updatedCandidateVoteCountMap, voters = List.delete voter voters
+
+        -- Give an administrator the exercise option to open the election.
+        choice OpenElection : ContractId Election
+            controller administrators
+                do
+                    assertMsg "The election is already open!" (not isElectionOpen)
+                    create this with isElectionOpen = True
+
+        -- Give an administrator the exercise option to close the election.
+        choice CloseElection : ContractId Election
+            controller administrators
+                do
+                    assertMsg "The election isn't open!" (isElectionOpen)
+                    create this with isElectionOpen = False
+
+        -- Give an administrator the exercise option to register a voter.
+        choice RegisterVoter : ContractId Election
+            with
+                voter : Party
+            controller administrators
+                do
+                    assertMsg "The election is already open! It's too late to register voters." (not isElectionOpen)
+                    create this with voters = voter::voters
+
+        -- Give an administrator the exercise option to register an electoral candidate.
+        choice RegisterCandidate : ContractId Election
+            with
+                candidate : Party
+            controller administrators
+                do
+                    assertMsg "The election is already open! It's too late to register voters." (not isElectionOpen)
+                    create this with candidates = candidate::candidates
+
+        -- Give an administrator the exercise option to unregister an electoral candidate who has dropped out of the race.
+        choice UnregisterCandidate : ContractId Election
+            with
+                candidate : Party
+            controller administrators
+                do
+                    create this with candidateVoteCountMap = Map.delete candidate candidateVoteCountMap, candidates = List.delete candidate candidates
+    
+
+
+
+
+    
