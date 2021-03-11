@@ -18,8 +18,9 @@ template Election
         candidates : [Party] -- Different candidates that voters can vote for.
         isElectionOpen : Bool -- Voters should be only be able when the election is open.
     where 
+        -- The voters and candidates are not observers since they should not be able
+        -- to view what registered voters are active in the constituency.
         signatory administrators
-        observer voters, candidates -- Voters and Candidates are able to see live how the election progresses.
 
         key (administrators, constituency): ElectionKey
         maintainer key._1 -- Specify who owns the election key.
@@ -36,9 +37,11 @@ template Election
                     assertMsg "The voter's candidate choice is not one of the available candidates'." (candidateChoice `elem` candidates)
                     
                     let
+                        -- Fetch the current vote count for chosen candidate, increment it, and update the map.
                         currentVoteCount = fromOptional 0 (Map.lookup candidateChoice this.candidateVoteCountMap) 
                         updatedCandidateVoteCountMap = Map.insert candidateChoice (currentVoteCount + 1) this.candidateVoteCountMap
 
+                    -- Remove the voter from the list of registered voters, since a voter can't cast more than one vote
                     create this with candidateVoteCountMap = updatedCandidateVoteCountMap, voters = List.delete voter voters
 
         -- Give an administrator the exercise option to open the election.
