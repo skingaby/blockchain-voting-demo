@@ -13,7 +13,7 @@ template Election
     with
         constituency : Text -- The name of the constiuency (or "electoral districts" in the US).
         administrators : [Party] 
-        voters : [Party] -- Registered voters who yet to cast their vote.
+        voters : [Party] -- Registered voters who have yet to cast their vote.
         candidateVoteCountMap : Map Party Int -- Map of candidates to their corresponding vote counts.
         candidates : [Party] -- Different candidates that voters can vote for.
         isElectionOpen : Bool -- Voters should be only be able when the election is open.
